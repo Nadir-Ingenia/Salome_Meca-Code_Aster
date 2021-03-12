@@ -1,0 +1,162 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+@author: Nadir Ingenia
+@date : 10/03/2021
+@web : https://nadir-ingenia.fr/
+"""
+#
+"Tutoriel Code_Aster & Salome_Meca - Modèle poutre - Nadir Ingenia"
+#
+
+from math import *
+import sys
+import salome
+
+
+####################################################
+##                   Variables                    ##
+####################################################
+
+# Longueur de la poutre - L_p (mm) :
+L_p = 350
+
+# largueur de la poutre - la_p (mm) :
+La_p = 20
+
+# Hauteur de la poutre - h_p (mm)
+h_p = 20
+
+salome.salome_init()
+theStudy = salome.myStudy
+
+import salome_notebook
+notebook = salome_notebook.NoteBook(theStudy)
+sys.path.insert( 0, r'/.../Demo_Poutre_Aster_Script.py')
+
+
+####################################################
+##       Begin of NoteBook variables section      ##
+####################################################
+
+# Parametres de construction de la géométrie
+
+notebook.set("P1_X", 0)
+notebook.set("P1_Y", -La_p/2)
+notebook.set("P1_Z", -h_p/2)
+
+notebook.set("P2_X", 0)
+notebook.set("P2_Y", -La_p/2)
+notebook.set("P2_Z", h_p/2)
+
+notebook.set("P3_X", 0)
+notebook.set("P3_Y", La_p/2)
+notebook.set("P3_Z", h_p/2)
+
+notebook.set("P4_X", 0)
+notebook.set("P4_Y", La_p/2)
+notebook.set("P4_Z", -h_p/2)
+
+#
+
+notebook.set("P5_X", L_p)
+notebook.set("P5_Y", -La_p/2)
+notebook.set("P5_Z", -h_p/2)
+
+notebook.set("P6_X", L_p)
+notebook.set("P6_Y", -La_p/2)
+notebook.set("P6_Z", h_p/2)
+
+notebook.set("P7_X", L_p)
+notebook.set("P7_Y", La_p/2)
+notebook.set("P7_Z", h_p/2)
+
+notebook.set("P8_X", L_p)
+notebook.set("P8_Y", La_p/2)
+notebook.set("P8_Z", -h_p/2)
+
+##############
+
+import GEOM
+from salome.geom import geomBuilder
+import math
+import SALOMEDS
+
+geompy = geomBuilder.New(theStudy)
+
+O = geompy.MakeVertex(0, 0, 0)
+OX = geompy.MakeVectorDXDYDZ(1, 0, 0)
+OY = geompy.MakeVectorDXDYDZ(0, 1, 0)
+OZ = geompy.MakeVectorDXDYDZ(0, 0, 1)
+
+P1 = geompy.MakeVertex("P1_X", "P1_Y", "P1_Z")
+P2 = geompy.MakeVertex("P2_X", "P2_Y", "P2_Z")
+P3 = geompy.MakeVertex("P3_X", "P3_Y", "P3_Z")
+P4 = geompy.MakeVertex("P4_X", "P4_Y", "P4_Z")
+
+P5 = geompy.MakeVertex("P5_X", "P5_Y", "P5_Z")
+P6 = geompy.MakeVertex("P6_X", "P6_Y", "P6_Z")
+P7 = geompy.MakeVertex("P7_X", "P7_Y", "P7_Z")
+P8 = geompy.MakeVertex("P8_X", "P8_Y", "P8_Z")
+
+LA = geompy.MakeEdge(P1, P2)
+LB = geompy.MakeEdge(P2, P3)
+LC = geompy.MakeEdge(P3, P4)
+LD = geompy.MakeEdge(P4, P1)
+
+LE = geompy.MakeEdge(P5, P6)
+LF = geompy.MakeEdge(P6, P7)
+LG = geompy.MakeEdge(P7, P8)
+LH = geompy.MakeEdge(P8, P5)
+
+LI = geompy.MakeEdge(P1, P5)
+LJ = geompy.MakeEdge(P2, P6)
+LK = geompy.MakeEdge(P3, P7)
+LL = geompy.MakeEdge(P4, P8)
+
+S1 = geompy.MakeFaceWires([LA, LB, LC, LD], 1)
+S2 = geompy.MakeFaceWires([LE, LF, LG, LH], 1)
+S3 = geompy.MakeFaceWires([LA, LJ, LE, LI], 1)
+S4 = geompy.MakeFaceWires([LB, LK, LF, LJ], 1)
+S5 = geompy.MakeFaceWires([LL, LC, LK, LG], 1)
+S6 = geompy.MakeFaceWires([LI, LD, LL, LH], 1)
+
+Poutre = geompy.MakeSolidFromConnectedFaces([S1, S2, S3, S4, S5, S6],True)
+
+# Ajout de la géométrie dans l'étude
+geompy.addToStudy( Poutre, 'Poutre' )
+
+# Extraction des Faces de contidions aux limites et des chargements et ajout à l'objet "père"
+Face_All=geompy.ExtractShapes(Poutre, geompy.ShapeType["FACE"],True)
+for i in range(len(Face_All)):
+	xyz=geompy.PointCoordinates(geompy.MakeCDG(Face_All[i]))
+	if abs(xyz[0])<0.01:
+			geompy.addToStudyInFather(Poutre, Face_All[i], "Fixed")
+			Face_Fixed=Face_All[i]
+	if abs(xyz[0])>L_p-0.01:
+			geompy.addToStudyInFather(Poutre, Face_All[i], "Forced")
+			Face_Forced=Face_All[i]
+
+###
+### SMESH component
+###
+
+import  SMESH, SALOMEDS
+from salome.smesh import smeshBuilder
+
+smesh = smeshBuilder.New(theStudy)
+
+Mesh_Poutre = smesh.Mesh(Poutre)
+NETGEN_1D_2D_3D = Mesh_Poutre.Tetrahedron(algo=smeshBuilder.NETGEN_1D2D3D)
+NETGEN_3D_Parameters_1 = NETGEN_1D_2D_3D.Parameters()
+NETGEN_3D_Parameters_1.SetMaxSize( 4 )
+NETGEN_3D_Parameters_1.SetSecondOrder( 1 )
+NETGEN_3D_Parameters_1.SetMinSize( 2 )
+
+Poutre_1 = Mesh_Poutre.GroupOnGeom(Poutre,'Poutre',SMESH.VOLUME)
+Fixed_1 = Mesh_Poutre.GroupOnGeom(Face_Fixed,'Fixed',SMESH.FACE)
+Force_1 = Mesh_Poutre.GroupOnGeom(Face_Forced,'Forced',SMESH.FACE)
+[ Poutre_1, Fixed_1, Force_1 ] = Mesh_Poutre.GetGroups()
+
+isDone = Mesh_Poutre.Compute()
