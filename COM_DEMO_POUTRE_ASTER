@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+@author: Nadir Ingenia
+@date : 10/03/2021
+@web : https://nadir-ingenia.fr/
+"""
+#
+"Tutoriel Code_Aster & Salome_Meca - Modèle poutre - Nadir Ingenia"
+#
+
+DEBUT()
+
+mesh = LIRE_MAILLAGE(FORMAT='MED', UNITE=20)
+
+model = AFFE_MODELE(
+    AFFE=(
+        _F(GROUP_MA=('Poutre','Forced',), MODELISATION=('3D', ), PHENOMENE='MECANIQUE'), 
+    ),
+    MAILLAGE=mesh
+)
+
+mater = DEFI_MATERIAU(ELAS=_F(E=215000, NU=0.3))
+
+fieldmat = AFFE_MATERIAU(
+    AFFE=(
+        _F(GROUP_MA=('Poutre',), MATER=(mater, )),
+    ),
+    MODELE=model
+)
+
+load = AFFE_CHAR_MECA(
+    DDL_IMPO=(
+        _F(GROUP_MA=('Fixed'), LIAISON='ENCASTRE'),   
+    ),
+    FORCE_FACE=(
+    _F(FX=-0.7, GROUP_MA=('Forced')),
+    ),
+
+    MODELE=model
+)
+
+reslin = MECA_STATIQUE( CHAM_MATER=fieldmat, EXCIT=_F(CHARGE=load),
+    MODELE=model
+)
+
+IMPR_RESU(FORMAT='MED', RESU=_F(RESULTAT=reslin), UNITE=80)
+
+FIN()
